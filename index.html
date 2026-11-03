@@ -171,8 +171,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;-webki
   <div class="next" id="nexts"></div>
   <div class="row3">
     <div class="tabs" role="tablist">
-      <button class="tab" role="tab" id="tGrid" aria-selected="true">한눈에</button>
-      <button class="tab" role="tab" id="tList" aria-selected="false">목록</button>
+      <button class="tab" role="tab" id="tList" aria-selected="true">목록</button>
       <button class="tab" role="tab" id="tTask" aria-selected="false">마감</button>
     </div>
     <div class="chips" id="chips"></div>
@@ -180,8 +179,8 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;-webki
 </div></header>
 
 <main class="wrap">
-  <section class="grid" id="grid"></section>
-  <section class="list" id="list" hidden></section>
+  <section class="grid" id="grid" hidden></section>
+  <section class="list" id="list"></section>
   <section class="list" id="tasks" hidden></section>
   <p class="foot" id="foot"></p>
 </main>
@@ -210,11 +209,17 @@ const CAT={"10":["생글즈","#0b8043"],"7":["모임","#039be5"],"9":["강의","
 const TL_COL=["#c2410c","#0b8043","#3f51b5","#b45309","#8e24aa","#039be5","#d50000","#616161"];
 const tlCol=l=>{let h=0;for(const ch of l)h=(h*31+ch.charCodeAt(0))>>>0;return TL_COL[h%TL_COL.length]};
 let showDone=false;
-let pub=null, prv=null, meta=null, key=null, idx={}, year, view="grid";
+let pub=null, prv=null, meta=null, key=null, idx={}, year, view="list", firstScroll=true;
 let filt={off:1,memo:1,jeol:1,sesi:1,me:1};
 try{Object.assign(filt,JSON.parse(localStorage.getItem(FILTER_LS)||"{}"))}catch(e){}
 try{key=localStorage.getItem(KEY_LS)}catch(e){}
-if(location.hash.startsWith("#k=")){key=decodeURIComponent(location.hash.slice(3));try{localStorage.setItem(KEY_LS,key)}catch(e){}history.replaceState(null,"",location.pathname)}
+if(location.hash.startsWith("#k=")){key=decodeURIComponent(location.hash.slice(3));try{localStorage.setItem(KEY_LS,key)}catch(e){}}
+if(key){ // 설치(홈 화면에 추가)한 앱도 문구 없이 열리게 시작 주소에 붙여 둔다(주소 # 뒤는 서버로 전송되지 않음)
+  const base=location.origin+location.pathname;
+  const mf={name:"한해 달력",short_name:"한해 달력",start_url:base+"#k="+encodeURIComponent(key),scope:base,display:"standalone",background_color:"#f6f3ee",theme_color:"#f6f3ee",lang:"ko",
+    icons:[{src:base+"icon-192.png",sizes:"192x192",type:"image/png"},{src:base+"icon-512.png",sizes:"512x512",type:"image/png"},{src:base+"icon-maskable-512.png",sizes:"512x512",type:"image/png",purpose:"maskable"}]};
+  document.querySelector('link[rel="manifest"]').href="data:application/manifest+json,"+encodeURIComponent(JSON.stringify(mf));
+}
 
 const pad=n=>String(n).padStart(2,"0");
 const ds=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -373,17 +378,16 @@ function renderAll(){
   $("#foot").innerHTML=`공휴일: 구글 「대한민국의 휴일」 · 절기: 태양 황경 계산(한국 표준시) · 세시: 음력 기준`+(meta?`<br>마지막 동기화 ${new Date(meta.updated).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}`+(prv?` · 내 일정 ${prv.events.length}건`:" · 내 일정 잠김"):"");
   document.documentElement.style.setProperty("--toph",$("#top").offsetHeight+"px");
 }
-function setView(v){view=v;for(const[id,k]of[["tGrid","grid"],["tList","list"],["tTask","tasks"]])$("#"+id).setAttribute("aria-selected",v===k);
+function setView(v){view=v;for(const[id,k]of[["tList","list"],["tTask","tasks"]])$("#"+id).setAttribute("aria-selected",v===k);
   $("#grid").hidden=v!=="grid";$("#list").hidden=v!=="list";$("#tasks").hidden=v!=="tasks";renderAll();if(v==="tasks")scrollTo({top:0})}
 $("#tTask").onclick=()=>setView("tasks");
-$("#tGrid").onclick=()=>setView("grid");
 $("#tList").onclick=()=>{setView("list");if(year===today().getFullYear())requestAnimationFrame(()=>{const r=$("#todayRow");if(r)scrollTo({top:r.offsetTop-$("#top").offsetHeight-70})})};
 function setYear(y){const[a,b]=pub?pub.range:[2025,2030];if(y<a||y>b){toast(`${a}~${b}년만 볼 수 있어요`);return}year=y;renderAll();scrollTo({top:0})}
 $("#prev").onclick=()=>setYear(year-1);$("#next").onclick=()=>setYear(year+1);
 $("#todayBtn").onclick=()=>{setYear(today().getFullYear());openDay(ds(today()))};
 addEventListener("keydown",e=>{if($("#modal").classList.contains("on"))return;if(e.key==="ArrowLeft")setYear(year-1);if(e.key==="ArrowRight")setYear(year+1);if(e.key==="Escape")closeDay()});
-let sx=null,sy=0;$("#grid").addEventListener("touchstart",e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY},{passive:true});
-$("#grid").addEventListener("touchend",e=>{if(sx===null)return;const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;sx=null;if(Math.abs(dx)>80&&Math.abs(dx)>Math.abs(dy)*2)setYear(year+(dx<0?1:-1))});
+let sx=null,sy=0;$("#list").addEventListener("touchstart",e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY},{passive:true});
+$("#list").addEventListener("touchend",e=>{if(sx===null)return;const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;sx=null;if(Math.abs(dx)>80&&Math.abs(dx)>Math.abs(dy)*2)setYear(year+(dx<0?1:-1))});
 
 // 잠금
 function openModal(){$("#err").textContent="";$("#pass").value="";$("#modal").classList.add("on");setTimeout(()=>$("#pass").focus(),50)}
@@ -407,8 +411,9 @@ async function load(manual){
       if(key){try{prv=await decrypt(await getJSON("data/private.json"),key)}catch(e){prv=null;key=null;try{localStorage.removeItem(KEY_LS)}catch(_){};toast("비밀 문구가 바뀌었어요. 다시 열어 주세요")}}
       if(meta&&changed)toast("새 일정이 반영됐어요");
       meta=m;buildIndex();renderAll();
+      if(firstScroll&&view==="list"){firstScroll=false;requestAnimationFrame(()=>{const r=$("#todayRow");if(r)scrollTo({top:r.offsetTop-$("#top").offsetHeight-70})})}
     }else if(manual)toast("이미 최신이에요");
-  }catch(e){if(!pub)$("#grid").innerHTML='<p class="empty">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</p>';else if(manual)toast("인터넷 연결을 확인해 주세요")}
+  }catch(e){if(!pub)$("#list").innerHTML='<p class="empty">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</p>';else if(manual)toast("인터넷 연결을 확인해 주세요")}
   loading=false;$("#refresh").classList.remove("spin");
 }
 $("#refresh").onclick=()=>load(true);
